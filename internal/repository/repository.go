@@ -28,7 +28,7 @@ type EBRepo interface {
 	UpdateBookStatus(ctx context.Context, exec ebpostgres.Executor, bookID int, newStatus string) error
 
 	GetEventByID(ctx context.Context, exec ebpostgres.Executor, eventID int) (*model.Event, error)
-	GetEventsList(ctx context.Context, exec ebpostgres.Executor) ([]model.Event, error)
+	GetEventsList(ctx context.Context, exec ebpostgres.Executor) ([]*model.Event, error)
 	GetBookByID(ctx context.Context, exec ebpostgres.Executor, bookID int) (*model.Book, error)
 	GetBooksListByUser(ctx context.Context, exec ebpostgres.Executor, id int) ([]*model.Book, error)
 	GetExpiredBooksList(ctx context.Context, exec ebpostgres.Executor) ([]*model.Book, error)

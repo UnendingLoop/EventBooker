@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS bookings (
         )
     ),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirm_deadline TIMESTAMPTZ NOT NULL,
     --confirmed_at TIMESTAMPTZ,
     CONSTRAINT fk_bookings_events FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_bookings_users FOREIGN KEY (user_id) REFERENCES users (uid) ON UPDATE CASCADE ON DELETE CASCADE

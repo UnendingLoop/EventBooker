@@ -22,7 +22,7 @@ var (
 	ErrBookIsCancelled    = errors.New("the book is already cancelled")
 )
 
-func validateUser(u *model.User) error {
+func validateNormalizeUser(u *model.User) error {
 	/*	User struct {
 		ID       int
 		Role     string
@@ -72,7 +72,7 @@ func normalizePhone(s string) string {
 	return s
 }
 
-func validateEvent(event *model.Event) error {
+func validateNormalizeEvent(event *model.Event) error {
 	if event.Title == "" || event.TotalSeats <= 0 || event.BookWindow <= 0 {
 		return ErrEmptyEventInfo
 	}

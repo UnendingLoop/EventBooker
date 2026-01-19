@@ -21,7 +21,7 @@ func NewEBService(ebrepo repository.EBRepo, ebdb *dbpg.DB) *EBService {
 }
 
 func (eb EBService) CreateUser(ctx context.Context, user *model.User) error {
-	if err := validateUser(user); err != nil {
+	if err := validateNormalizeUser(user); err != nil {
 		return err
 	}
 
@@ -34,7 +34,7 @@ func (eb EBService) CreateUser(ctx context.Context, user *model.User) error {
 }
 
 func (eb EBService) CreateEvent(ctx context.Context, event *model.Event) error {
-	if err := validateEvent(event); err != nil {
+	if err := validateNormalizeEvent(event); err != nil {
 		return err // 400
 	}
 
@@ -78,6 +78,8 @@ func (eb EBService) BookEvent(ctx context.Context, book *model.Book) error {
 	if event.AvailSeats == 0 {
 		return ErrNoSeatsAvailable // 409
 	}
+
+	book.ConfirmDeadline = time.Now().UTC().Add(time.Duration(event.BookWindow) * time.Second)
 
 	// создание записи
 	if err := eb.repo.CreateBook(ctx, tx, book); err != nil {
@@ -173,6 +175,15 @@ func (eb EBService) CancelBook(ctx context.Context, bid int) error { // не у�
 	// коммит транзакции
 	if err := tx.Commit(); err != nil {
 		log.Println("Failed to commit transaction:", err)
+		return ErrCommon500
+	}
+
+	return nil
+}
+
+func (eb EBService) DeleteEvent(ctx context.Context, eid int) error { // добавить проверку роли пользователя
+	if err := eb.repo.DeleteEvent(ctx, eb.db, eid); err != nil {
+		log.Printf("Failed to delete event in DB: %v", err)
 		return ErrCommon500
 	}
 

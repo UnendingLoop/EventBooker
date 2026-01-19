@@ -2,6 +2,7 @@
 package model
 
 import (
+	"errors"
 	"strings"
 	"time"
 )
@@ -19,6 +20,12 @@ const (
 	EventStatusCancelled = "cancelled"
 )
 
+var (
+	ErrUserNotFound  = errors.New("the requested user id not found")
+	ErrBookNotFound  = errors.New("the requested book id not found")
+	ErrEventNotFound = errors.New("the requested event id not found")
+)
+
 type (
 	Event struct {
 		ID         int        `json:"id,omitempty"`
@@ -32,12 +39,12 @@ type (
 		BookWindow int        `json:"period,omitempty"` // период жизни неподтвержденной брони в секундах
 	}
 	Book struct {
-		ID      int
-		EventID int
-		UserID  int
-		Status  string
-		Created time.Time
-		// Confirmed *time.Time // не забыть удалить в миграции
+		ID              int
+		EventID         int
+		UserID          int
+		Status          string
+		Created         time.Time
+		ConfirmDeadline time.Time
 	}
 	User struct {
 		ID       int    `json:"id,omitempty"`
