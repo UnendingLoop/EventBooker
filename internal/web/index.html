@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>EventBooker</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 1100px;
+            margin: 20px auto;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 6px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>EventBooker</h1>
+
+    <!-- AUTH -->
+    <div id="auth">
+        <h2>Login</h2>
+        <input id="login" placeholder="login" />
+        <input id="password" type="password" placeholder="password" />
+        <button onclick="login()">Login</button>
+        <div id="authError"></div>
+    </div>
+
+    <!-- EVENTS -->
+    <div id="events" class="hidden">
+        <h2>Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Seats</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="eventsBody"></tbody>
+        </table>
+    </div>
+
+    <!-- BOOKINGS -->
+    <div id="bookings" class="hidden">
+        <h2>My bookings</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="bookingsBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const API = "http://localhost:8080";
+        let token = localStorage.getItem("token");
+        let role = null;
+
+        function authHeaders() {
+            return { "Authorization": "Bearer " + token };
+        }
+
+        async function login() {
+            const res = await fetch(API + "/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    login: login.value,
+                    password: password.value
+                })
+            });
+
+            if (!res.ok) {
+                authError.innerText = "Login failed";
+                return;
+            }
+
+            const data = await res.json();
+            token = data.token;
+            role = data.user.role;
+
+            localStorage.setItem("token", token);
+            init();
+        }
+
+        async function loadEvents() {
+            const res = await fetch(API + "/events", { headers: authHeaders() });
+            const events = await res.json();
+
+            eventsBody.innerHTML = "";
+            events.forEach(e => {
+                const tr = document.createElement("tr");
+
+                let actions = `<button onclick="book('${e.id}')">Book</button>`;
+                if (role === "admin") {
+                    actions += ` <button onclick="delEvent('${e.id}')">Delete</button>`;
+                }
+
+                tr.innerHTML = `
+      <td>${e.title}</td>
+      <td>${e.date}</td>
+      <td>${e.available_seats}</td>
+      <td>${actions}</td>
+    `;
+                eventsBody.appendChild(tr);
+            });
+        }
+
+        async function loadBookings() {
+            const res = await fetch(API + "/bookings", { headers: authHeaders() });
+            const bookings = await res.json();
+
+            bookingsBody.innerHTML = "";
+            bookings.forEach(b => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+      <td>${b.event_title}</td>
+      <td>${b.event_date}</td>
+      <td><button onclick="cancel('${b.id}')">Cancel</button></td>
+    `;
+                bookingsBody.appendChild(tr);
+            });
+        }
+
+        async function book(id) {
+            await fetch(API + "/bookings", {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ event_id: id })
+            });
+            loadEvents();
+            loadBookings();
+        }
+
+        async function cancel(id) {
+            await fetch(API + "/bookings/" + id, {
+                method: "DELETE",
+                headers: authHeaders()
+            });
+            loadBookings();
+            loadEvents();
+        }
+
+        async function delEvent(id) {
+            await fetch(API + "/events/" + id, {
+                method: "DELETE",
+                headers: authHeaders()
+            });
+            loadEvents();
+        }
+
+        function init() {
+            if (!token) return;
+
+            auth.classList.add("hidden");
+            events.classList.remove("hidden");
+            bookings.classList.remove("hidden");
+
+            loadEvents();
+            loadBookings();
+        }
+
+        init();
+    </script>
+
+</body>
+
+</html>

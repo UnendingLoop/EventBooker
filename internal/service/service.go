@@ -158,6 +158,9 @@ func (eb EBService) BookEvent(ctx context.Context, book *model.Book, uid int) er
 		log.Printf("RID %q Failed to commit transaction in 'BookEvent': %v", rid, err)
 		return model.ErrCommon500
 	}
+
+	commited = true
+
 	return nil
 }
 

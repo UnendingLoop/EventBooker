@@ -4,17 +4,13 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o /bin/api ./cmd/api
-RUN go build -o /bin/worker ./cmd/worker
+RUN go build -o eventbooker ./main.go
 
-FROM alpine:3.20
+FROM alpine:3.18
 WORKDIR /app
-
-RUN apk add --no-cache ca-certificates
-COPY --from=builder /bin/api /usr/local/bin/api
-COPY --from=builder /bin/worker /usr/local/bin/worker
-
-COPY .env .env
+COPY --from=builder /app/eventbooker .
+COPY .env .
 COPY internal/web /app/internal/web
-COPY internal/migrations /app/migrations
+COPY internal/migrations/ /app/migrations/
 EXPOSE 8080
+CMD ["./eventbooker"]

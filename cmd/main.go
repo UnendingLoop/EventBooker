@@ -105,8 +105,10 @@ func shutdown(dbConn *dbpg.DB, srv *http.Server) {
 	log.Println("Interrupt received! Starting shutdown sequence...")
 
 	// Closing Server
-	if err := srv.Close(); err != nil {
-		log.Println("Failed to close server correctly:", err)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Println("Failed to shutdown server correctly:", err)
 	} else {
 		log.Println("Server is closed.")
 	}

@@ -22,8 +22,8 @@ type Executor interface {
 // CreateEvent - создание ивента доступно только для админа
 func (pr PostgresRepo) CreateEvent(ctx context.Context, exec Executor, newEvent *model.Event) error {
 	query := `INSERT INTO events (id, title, description, status, event_date, created_at, bookwindow, total_seats, avail_seats)
-	VALUES (DEFAULT, $1, $2, $3, $4, DEFAULT, $5, $6, $7)`
-	_, err := exec.ExecContext(ctx, query, newEvent.Title, newEvent.Descr, newEvent.Status, newEvent.EventDate, newEvent.BookWindow, newEvent.TotalSeats, newEvent.AvailSeats)
+	VALUES (DEFAULT, $1, $2, $3, $4, DEFAULT, $5, $6, $7) RETURNING id`
+	err := exec.QueryRowContext(ctx, query, newEvent.Title, newEvent.Descr, newEvent.Status, newEvent.EventDate, newEvent.BookWindow, newEvent.TotalSeats, newEvent.AvailSeats).Scan(&newEvent.ID)
 	if err != nil {
 		return err
 	}
@@ -32,8 +32,8 @@ func (pr PostgresRepo) CreateEvent(ctx context.Context, exec Executor, newEvent 
 
 func (pr PostgresRepo) CreateBook(ctx context.Context, exec Executor, newBook *model.Book) error {
 	query := `INSERT INTO bookings (id, event_id, user_id, status, created_at, confirm_deadline)
-	VALUES (DEFAULT, $1, $2, $3, DEFAULT, $4)`
-	_, err := exec.ExecContext(ctx, query, newBook.EventID, newBook.UserID, newBook.Status, newBook.ConfirmDeadline)
+	VALUES (DEFAULT, $1, $2, $3, DEFAULT, $4) RETURNING id`
+	err := exec.QueryRowContext(ctx, query, newBook.EventID, newBook.UserID, newBook.Status, newBook.ConfirmDeadline).Scan(&newBook.ID)
 	if err != nil {
 		return err
 	}
@@ -42,8 +42,8 @@ func (pr PostgresRepo) CreateBook(ctx context.Context, exec Executor, newBook *m
 
 func (pr PostgresRepo) CreateUser(ctx context.Context, exec Executor, newUser *model.User) error {
 	query := `INSERT INTO users (id, created_at, role, name, surname, tel, email, pass_hash)
-	VALUES (DEFAULT, DEFAULT, $1, $2, $3, $4, $5, $6)`
-	_, err := exec.ExecContext(ctx, query, newUser.Role, newUser.Name, newUser.Surname, newUser.Tel, newUser.Email, newUser.PassHash)
+	VALUES (DEFAULT, DEFAULT, $1, $2, $3, $4, $5, $6) RETURNING id`
+	err := exec.QueryRowContext(ctx, query, newUser.Role, newUser.Name, newUser.Surname, newUser.Tel, newUser.Email, newUser.PassHash).Scan(&newUser.ID)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,10 @@ func (pr PostgresRepo) DeleteEvent(ctx context.Context, exec Executor, eventID i
 		return err // 500
 	}
 
-	rows, _ := res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err // 500
+	}
 	if rows == 0 {
 		return model.ErrEventNotFound // 404
 	}
@@ -72,11 +75,17 @@ func (pr PostgresRepo) DeleteBook(ctx context.Context, exec Executor, bookID int
 	query := `DELETE FROM bookings
 	WHERE id = $1`
 
-	_, err := exec.ExecContext(ctx, query, bookID)
+	row, err := exec.ExecContext(ctx, query, bookID)
 	if err != nil {
 		return err // 500
 	}
-
+	n, err := row.RowsAffected()
+	if err != nil {
+		return err // 500
+	}
+	if n == 0 {
+		return model.ErrBookNotFound
+	}
 	return nil
 }
 
