@@ -8,7 +8,7 @@ import (
 )
 
 type BookCleaner struct {
-	BCsvc CleanerService
+	bsvc CleanerService
 }
 
 type CleanerService interface {
@@ -16,7 +16,7 @@ type CleanerService interface {
 }
 
 func NewBookCleaner(svc CleanerService) *BookCleaner {
-	return &BookCleaner{BCsvc: svc}
+	return &BookCleaner{bsvc: svc}
 }
 
 func (bc *BookCleaner) StartBookCleaner(ctx context.Context, interval int) {
@@ -46,7 +46,7 @@ func (bc *BookCleaner) runOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := bc.BCsvc.CleanExpiredBooks(ctx)
+	err := bc.bsvc.CleanExpiredBooks(ctx)
 	if err != nil {
 		log.Printf("Failed to cancel expired bookings: %v", err)
 	}

@@ -1,0 +1,99 @@
+// Package mwauthlogger provides UUID-logging to every request
+package mwauthlog
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+)
+
+type (
+	Claims struct {
+		UserID int    `json:"uid"`
+		Email  string `json:"email"`
+		Role   string `json:"role"`
+		jwt.RegisteredClaims
+	}
+)
+
+func RequestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rid := uuid.New().String()
+
+		ctx := context.WithValue(c.Request.Context(), "request_id", rid)
+		c.Request = c.Request.WithContext(ctx)
+
+		c.Header("X-Request-ID", rid)
+		c.Set("request_id", rid)
+
+		c.Next()
+	}
+}
+
+func GenerateToken(userID int, role string, secret []byte) (string, error) {
+	claims := Claims{
+		UserID: userID,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secret)
+}
+
+func RequireAuth(secret []byte) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if header == "" {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		parts := strings.Split(header, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		tokenStr := parts[1]
+
+		token, err := jwt.ParseWithClaims(
+			tokenStr,
+			&Claims{},
+			func(token *jwt.Token) (any, error) {
+				return secret, nil
+			},
+		)
+
+		if err != nil || !token.Valid {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		claims := token.Claims.(*Claims)
+
+		// прокидываем дальше
+		c.Set("user_id", claims.UserID)
+		c.Set("role", claims.Role)
+
+		c.Next()
+	}
+}
+
+func RequireRole(role string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		r, exists := c.Get("role")
+		if !exists || r != role {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+		c.Next()
+	}
+}

@@ -122,10 +122,13 @@ func (pr PostgresRepo) GetEventByID(ctx context.Context, exec Executor, id int) 
 	return &event, nil
 }
 
-func (pr PostgresRepo) GetEventsList(ctx context.Context, exec Executor) ([]*model.Event, error) {
+func (pr PostgresRepo) GetEventsList(ctx context.Context, exec Executor, role string) ([]*model.Event, error) {
 	query := `SELECT id, title, description, status, event_date, created_at, bookwindow, total_seats, avail_seats 
-	FROM events 
-	WHERE event_date > now() AND status = 'actual'` // потом надо учесть роль запрашивающего
+	FROM events`
+	if role == model.RoleUser { // пользователю - только актуальные ивенты
+		query += ` WHERE event_date > now() AND status = 'actual'`
+	}
+
 	rows, err := exec.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -191,7 +194,12 @@ func (pr PostgresRepo) GetBooksListByUser(ctx context.Context, exec Executor, id
 	WHERE user_id = $1`
 	rows, err := exec.QueryContext(ctx, query, id)
 	if err != nil {
-		return nil, err
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, model.ErrUserNotFound
+		default:
+			return nil, err // 500
+		}
 	}
 
 	defer func() {
@@ -257,7 +265,7 @@ func (pr PostgresRepo) GetExpiredBooksList(ctx context.Context, exec Executor) (
 	return books, nil
 }
 
-func (pr PostgresRepo) GetUser(ctx context.Context, exec Executor, id int) (*model.User, error) {
+func (pr PostgresRepo) GetUserByID(ctx context.Context, exec Executor, id int) (*model.User, error) {
 	query := `SELECT id, created_at, role, name, surname, tel, email, pass_hash 
 	FROM users 
 	WHERE id = $1`
@@ -265,6 +273,32 @@ func (pr PostgresRepo) GetUser(ctx context.Context, exec Executor, id int) (*mod
 	var user model.User
 
 	err := exec.QueryRowContext(ctx, query, id).Scan(&user.ID,
+		&user.Created,
+		&user.Role,
+		&user.Name,
+		&user.Surname,
+		&user.Tel,
+		&user.Email,
+		&user.PassHash)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, model.ErrUserNotFound
+		default:
+			return nil, err // 500
+		}
+	}
+	return &user, nil
+}
+
+func (pr PostgresRepo) GetUserByEmail(ctx context.Context, exec Executor, email string) (*model.User, error) {
+	query := `SELECT id, created_at, role, name, surname, tel, email, pass_hash 
+	FROM users 
+	WHERE email = $1`
+
+	var user model.User
+
+	err := exec.QueryRowContext(ctx, query, email).Scan(&user.ID,
 		&user.Created,
 		&user.Role,
 		&user.Name,

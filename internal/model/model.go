@@ -2,7 +2,7 @@
 package model
 
 import (
-	"errors"
+	"context"
 	"strings"
 	"time"
 )
@@ -20,12 +20,6 @@ const (
 	EventStatusCancelled = "cancelled"
 )
 
-var (
-	ErrUserNotFound  = errors.New("the requested user id not found")
-	ErrBookNotFound  = errors.New("the requested book id not found")
-	ErrEventNotFound = errors.New("the requested event id not found")
-)
-
 type (
 	Event struct {
 		ID         int        `json:"id,omitempty"`
@@ -39,22 +33,22 @@ type (
 		BookWindow int        `json:"period,omitempty"` // период жизни неподтвержденной брони в секундах
 	}
 	Book struct {
-		ID              int
-		EventID         int
-		UserID          int
-		Status          string
-		Created         time.Time
-		ConfirmDeadline time.Time
+		ID              int        `json:"id,omitempty"`
+		EventID         int        `json:"eventid"`
+		UserID          int        `json:"userid"`
+		Status          string     `json:"status,omitempty"`
+		Created         *time.Time `json:"created_at,omitempty"`
+		ConfirmDeadline *time.Time `json:"confirm_deadline,omitempty"`
 	}
 	User struct {
-		ID       int    `json:"id,omitempty"`
-		Role     string `json:"role,omitempty"`
-		Created  time.Time
-		Name     string `json:"name"`
-		Surname  string `json:"surname,omitempty"`
-		Tel      string `json:"tel,omitempty"`
-		Email    string `json:"email"`
-		PassHash string `json:"password,omitempty"`
+		ID       int        `json:"id,omitempty"`
+		Role     string     `json:"role,omitempty"`
+		Created  *time.Time `json:"created,omitempty"`
+		Name     string     `json:"name"`
+		Surname  string     `json:"surname,omitempty"`
+		Tel      string     `json:"tel,omitempty"`
+		Email    string     `json:"email"`
+		PassHash string     `json:"password,omitempty"`
 	}
 
 	CustomTime struct {
@@ -78,4 +72,11 @@ func (ct *CustomTime) UnmarshalJSON(b []byte) error {
 
 func (ct *CustomTime) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + ct.Time.Format("2006-01-02") + `"`), nil
+}
+
+func RequestIDFromCtx(ctx context.Context) string {
+	if v := ctx.Value("request_id"); v != nil {
+		return v.(string)
+	}
+	return ""
 }

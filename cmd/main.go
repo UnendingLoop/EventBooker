@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/UnendingLoop/EventBooker/internal/cleaner"
+	"github.com/UnendingLoop/EventBooker/internal/mwauthlog"
 	"github.com/UnendingLoop/EventBooker/internal/repository"
 	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/dbpg"
@@ -41,35 +43,34 @@ func main() {
 	repository.MigrateWithRetries(dbConn.Master, "./migrations", 10, 15*time.Second)
 
 	// repo
+	// jwt
 	// service
 	// handlers
 	// конфиг сервера
 	mode := appConfig.GetString("GIN_MODE")
 	engine := ginext.New(mode)
-	events := engine.Group("/events")
-	books := engine.Group("/books")
+	engine.Use(
+		mwauthlog.RequestIDMiddleware()) // вставка уникального UID в каждый реквест
+
+	events := engine.Group("/events", mwauthlog.RequireAuth([]byte(appConfig.GetString("SECRET"))))
+	books := engine.Group("/books", mwauthlog.RequireAuth([]byte(appConfig.GetString("SECRET"))))
 	auth := engine.Group("/auth")
 
 	engine.GET("/ping")
-	engine.Static("/web", "./internal/web")
-	// НУЖНЫ ЕЩЕ:
-	// форма регистрации/авторизации - показывать если нет токена авторизации, иначе скрывать
-	// ui для админа - возможность создавать и удалять ивенты
-	// ui для пользователя - список всех ивентов + всех броней юзера
-	// продумать редирект на форму авторизации, если юзер незалогинен
+	engine.Static("", "./internal/web/base") // UI админа/юзера - функциональность и контент зависит от роли
 
-	auth.POST("/signup") // регистрация пользователя
-	auth.GET("/login")   // авторизация
+	auth.POST("/signup")                            // регистрация пользователя
+	auth.POST("/login")                             // авторизация
+	auth.Static("/signin", "./internal/web/signin") // страница с формой авторизации/регистрации
 
-	events.POST("")       // создание ивента - только админ
-	events.GET("/:id")    // инфа об ивенте и свободных местах
-	events.GET("")        // список всех ивентов
-	events.DELETE("/:id") // удаление ивента
+	events.POST("", mwauthlog.RequireRole("admin"))       // создание ивента - только админ
+	events.GET("")                                        // список всех ивентов
+	events.DELETE("/:id", mwauthlog.RequireRole("admin")) // удаление ивента
 
 	books.POST("")             // создание бронирования
 	books.POST("/:id/confirm") // подтверждение бронирования
-	books.GET("/user/:userid") // все брони по одному пользователю
-	books.DELETE("/:bookid")   // удаление/отмена брони
+	books.GET("/my")           // все брони по одному пользователю
+	books.DELETE("/:id")       // отмена брони
 
 	srv := &http.Server{
 		Addr:    ":" + appConfig.GetString("APP_PORT"),
@@ -92,6 +93,8 @@ func main() {
 	}()
 
 	// cleaner
+	clb := cleaner.NewBookCleaner(nil)
+	clb.StartBookCleaner(ctx, 30)
 
 	// слушаем контекст прерываний для запуска Graceful Shutdown
 	<-ctx.Done()

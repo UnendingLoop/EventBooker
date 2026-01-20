@@ -28,11 +28,12 @@ type EBRepo interface {
 	UpdateBookStatus(ctx context.Context, exec ebpostgres.Executor, bookID int, newStatus string) error
 
 	GetEventByID(ctx context.Context, exec ebpostgres.Executor, eventID int) (*model.Event, error)
-	GetEventsList(ctx context.Context, exec ebpostgres.Executor) ([]*model.Event, error)
+	GetEventsList(ctx context.Context, exec ebpostgres.Executor, role string) ([]*model.Event, error)
 	GetBookByID(ctx context.Context, exec ebpostgres.Executor, bookID int) (*model.Book, error)
 	GetBooksListByUser(ctx context.Context, exec ebpostgres.Executor, id int) ([]*model.Book, error)
 	GetExpiredBooksList(ctx context.Context, exec ebpostgres.Executor) ([]*model.Book, error)
-	GetUser(ctx context.Context, exec ebpostgres.Executor, userID int) (*model.User, error)
+	GetUserByID(ctx context.Context, exec ebpostgres.Executor, userID int) (*model.User, error)
+	GetUserByEmail(ctx context.Context, exec ebpostgres.Executor, email string) (*model.User, error)
 
 	IncrementAvailSeatsByEventID(ctx context.Context, exec ebpostgres.Executor, eventID int) error
 	DecrementAvailSeatsByEventID(ctx context.Context, exec ebpostgres.Executor, eventID int) error
