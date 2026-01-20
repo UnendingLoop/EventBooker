@@ -27,7 +27,17 @@ func (eh *EBHandlers) SignUpUser(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	resp := convertUserAuthToResponse(token, &newUser)
+	resp := convertUserAuthToResponse(&newUser)
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "access_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   3600,
+	})
 
 	ctx.JSON(http.StatusCreated, resp)
 }
@@ -74,7 +84,17 @@ func (eh *EBHandlers) LoginUser(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	resp := convertUserAuthToResponse(token, user)
+	resp := convertUserAuthToResponse(user)
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     "access_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   3600,
+	})
 
 	ctx.JSON(http.StatusOK, resp)
 }
@@ -107,7 +127,7 @@ func (eh *EBHandlers) DeleteEvent(ctx *gin.Context) {
 	}
 
 	eventID := stringToInt(rawID)
-	err := eh.svc.DeleteEvent(ctx.Request.Context(), eventID)
+	err := eh.svc.DeleteEvent(ctx.Request.Context(), eventID, role)
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return

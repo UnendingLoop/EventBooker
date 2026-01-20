@@ -1,10 +1,9 @@
-// Package mwauthlogger provides UUID-logging to every request
+// Package mwauthlog provides UUID-logging to every request
 package mwauthlog
 
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -50,19 +49,13 @@ func GenerateToken(userID int, role string, secret []byte) (string, error) {
 
 func RequireAuth(secret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if header == "" {
-			c.AbortWithStatus(http.StatusUnauthorized)
+		cookie, err := c.Request.Cookie("access_token")
+		if err != nil {
+			c.AbortWithStatus(401)
 			return
 		}
 
-		parts := strings.Split(header, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-
-		tokenStr := parts[1]
+		tokenStr := cookie.Value
 
 		token, err := jwt.ParseWithClaims(
 			tokenStr,

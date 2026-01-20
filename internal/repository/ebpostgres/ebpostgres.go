@@ -125,7 +125,7 @@ func (pr PostgresRepo) GetEventByID(ctx context.Context, exec Executor, id int) 
 func (pr PostgresRepo) GetEventsList(ctx context.Context, exec Executor, role string) ([]*model.Event, error) {
 	query := `SELECT id, title, description, status, event_date, created_at, bookwindow, total_seats, avail_seats 
 	FROM events`
-	if role == model.RoleUser { // пользователю - только актуальные ивенты
+	if role != model.RoleAdmin { // пользователю - только актуальные ивенты
 		query += ` WHERE event_date > now() AND status = 'actual'`
 	}
 

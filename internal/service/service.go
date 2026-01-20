@@ -21,8 +21,8 @@ type EBService struct {
 	jwtManager *mwauthlog.JWTManager
 }
 
-func NewEBService(ebrepo repository.EBRepo, ebdb *dbpg.DB) *EBService {
-	return &EBService{repo: ebrepo, db: ebdb}
+func NewEBService(ebrepo repository.EBRepo, ebdb *dbpg.DB, jwt *mwauthlog.JWTManager) *EBService {
+	return &EBService{repo: ebrepo, db: ebdb, jwtManager: jwt}
 }
 
 func (eb EBService) CreateUser(ctx context.Context, user *model.User) (string, error) {
@@ -428,10 +428,6 @@ func (eb EBService) GetBooksListByUserID(ctx context.Context, uid int) ([]*model
 
 func (eb EBService) GetEventsList(ctx context.Context, role string) ([]*model.Event, error) {
 	rid := model.RequestIDFromCtx(ctx)
-
-	if role != model.RoleAdmin && role != model.RoleUser {
-		return nil, model.ErrIncorrectUserRole
-	}
 
 	res, err := eb.repo.GetEventsList(ctx, eb.db, role)
 	if err != nil {

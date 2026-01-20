@@ -19,7 +19,7 @@ type HService interface {
 	ConfirmBook(ctx context.Context, bid int, uid int) error
 	CreateEvent(ctx context.Context, event *model.Event) error
 	CreateUser(ctx context.Context, user *model.User) (string, error)
-	DeleteEvent(ctx context.Context, eid int) error
+	DeleteEvent(ctx context.Context, eid int, role string) error
 	GetBooksListByUserID(ctx context.Context, uid int) ([]*model.Book, error)
 	LoginUser(ctx context.Context, email string, password string) (string, *model.User, error)
 	GetEventsList(ctx context.Context, role string) ([]*model.Event, error)
@@ -36,8 +36,7 @@ type authRequest struct {
 }
 
 type authResponse struct {
-	Token string     `json:"token"`
-	User  userPublic `json:"user"`
+	User userPublic `json:"user"`
 }
 
 type userPublic struct {
@@ -46,8 +45,8 @@ type userPublic struct {
 	Role  string `json:"role"`
 }
 
-func convertUserAuthToResponse(token string, user *model.User) *authResponse {
-	return &authResponse{Token: token, User: userPublic{ID: user.ID, Email: user.Email, Role: user.Role}}
+func convertUserAuthToResponse(user *model.User) *authResponse {
+	return &authResponse{User: userPublic{ID: user.ID, Email: user.Email, Role: user.Role}}
 }
 
 // ----------------------------------------------------------
