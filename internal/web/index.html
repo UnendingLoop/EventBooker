@@ -11,10 +11,19 @@
             margin: 20px auto;
         }
 
+
         table {
             border-collapse: collapse;
-            width: 100%;
+            width: auto;
+            table-layout: auto;
             margin-top: 10px;
+            margin-right: 30px;
+        }
+
+        th,
+        td {
+            padding: 6px 10px;
+            white-space: nowrap;
         }
 
         th,
@@ -25,10 +34,20 @@
 
         button {
             cursor: pointer;
+            margin: 2px;
+        }
+
+        input,
+        select {
+            margin: 2px;
         }
 
         .hidden {
             display: none;
+        }
+
+        h2 {
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -40,37 +59,77 @@
     <!-- AUTH -->
     <div id="auth">
         <h2>Login</h2>
-        <input id="login" placeholder="login" />
-        <input id="password" type="password" placeholder="password" />
+        <input id="signinLogin" placeholder="Login" />
+        <input id="password" type="password" placeholder="Password" />
         <button onclick="login()">Login</button>
         <div id="authError"></div>
+
+        <h2>Sign Up</h2>
+        <input id="signupLogin" placeholder="Login" />
+        <input id="signupPassword" type="password" placeholder="Password" />
+        <select id="signupRole">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button onclick="signup()">Sign Up</button>
+        <div id="signupError"></div>
     </div>
 
-    <!-- EVENTS -->
-    <div id="events" class="hidden">
+    <!-- EVENTS (admin) -->
+    <div id="eventsAdmin" class="hidden">
+        <h2>Create Event</h2>
+        <input id="eventTitle" placeholder="Title" />
+        <input id="eventDate" type="date" />
+        <input id="eventSeats" type="number" placeholder="Seats" />
+        <input id="eventPeriod" type="number" placeholder="Booking period in seconds" />
+        <button onclick="createNewEvent()">Create</button>
+
+        <h2>All Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Event ID</th>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Seats total</th>
+                    <th>Seats available</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="eventsAdminBody"></tbody>
+        </table>
+    </div>
+
+    <!-- EVENTS (user) -->
+    <div id="eventsUser" class="hidden">
         <h2>Events</h2>
         <table>
             <thead>
                 <tr>
+                    <th>Event ID</th>
                     <th>Title</th>
                     <th>Date</th>
-                    <th>Seats</th>
+                    <th>Seats total</th>
+                    <th>Seats available</th>
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="eventsBody"></tbody>
+            <tbody id="eventsUserBody"></tbody>
         </table>
     </div>
 
     <!-- BOOKINGS -->
     <div id="bookings" class="hidden">
-        <h2>My bookings</h2>
+        <h2>My Bookings</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Event</th>
-                    <th>Date</th>
-                    <th></th>
+                    <th>Book ID</th>
+                    <th>Event ID</th>
+                    <th>UserID</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="bookingsBody"></tbody>
@@ -80,20 +139,44 @@
     <script>
         const API = "http://localhost:8080";
         let token = localStorage.getItem("token");
-        let role = null;
+        let role = localStorage.getItem("role");
 
         function authHeaders() {
             return { "Authorization": "Bearer " + token };
         }
 
-        async function login() {
-            const res = await fetch(API + "/login", {
+        async function signup() {
+            const res = await apiFetch(API + "/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    login: login.value,
-                    password: password.value
+                    email: signupLogin.value,
+                    password: signupPassword.value,
+                    role: signupRole.value
                 })
+            });
+
+            if (!res.ok) {
+                signupError.innerText = "Sign up failed";
+                return;
+            }
+
+            const data = await res.json();
+            token = data.token;
+            role = data.user.role;
+
+            //localStorage.setItem("token", token);
+            localStorage.setItem("role", role);
+
+
+            init();
+        }
+
+        async function login() {
+            const res = await apiFetch(API + "/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: signinLogin.value, password: password.value })
             });
 
             if (!res.ok) {
@@ -104,90 +187,228 @@
             const data = await res.json();
             token = data.token;
             role = data.user.role;
+            email = data.email;
+            user_id = data.user.id;
 
             localStorage.setItem("token", token);
+            localStorage.setItem("role", role);
+            localStorage.setItem("email", email);
+            localStorage.setItem("user_id", user_id);
+
             init();
         }
 
-        async function loadEvents() {
-            const res = await fetch(API + "/events", { headers: authHeaders() });
+        async function loadEventsAdmin() {
+            const res = await apiFetch(API + "/events", { headers: authHeaders() });
             const events = await res.json();
 
-            eventsBody.innerHTML = "";
+            eventsAdminBody.innerHTML = "";
             events.forEach(e => {
                 const tr = document.createElement("tr");
-
-                let actions = `<button onclick="book('${e.id}')">Book</button>`;
-                if (role === "admin") {
-                    actions += ` <button onclick="delEvent('${e.id}')">Delete</button>`;
-                }
-
                 tr.innerHTML = `
+      <td>${e.id}</td>
       <td>${e.title}</td>
-      <td>${e.date}</td>
-      <td>${e.available_seats}</td>
-      <td>${actions}</td>
+      <td>${e.eventdate}</td>
+      <td>${e.total}</td>
+      <td>${e.avail}</td>
+
+      <td>
+        <button onclick="deleteEvent('${e.id}')">Delete</button>
+      </td>
     `;
-                eventsBody.appendChild(tr);
+                eventsAdminBody.appendChild(tr);
+            });
+        }
+
+        async function loadEventsUser() {
+            const res = await apiFetch(API + "/events", { headers: authHeaders() });
+            const events = await res.json();
+
+            eventsUserBody.innerHTML = "";
+            events.forEach(e => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+      <td>${e.id}</td>
+      <td>${e.title}</td>
+      <td>${e.eventdate}</td>
+      <td>${e.total}</td>
+      <td>${e.avail}</td>
+      <td>
+        <button onclick="book('${e.id}')">Book</button>
+      </td>
+    `;
+                eventsUserBody.appendChild(tr);
             });
         }
 
         async function loadBookings() {
-            const res = await fetch(API + "/bookings", { headers: authHeaders() });
+            const res = await apiFetch(API + "/bookings/my", { headers: authHeaders() });
             const bookings = await res.json();
 
             bookingsBody.innerHTML = "";
             bookings.forEach(b => {
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-      <td>${b.event_title}</td>
-      <td>${b.event_date}</td>
-      <td><button onclick="cancel('${b.id}')">Cancel</button></td>
+      <td>${b.id}</td>
+      <td>${b.eventid}</td>
+      <td>${b.userid}</td>
+      <td>${b.confirm_deadline}</td>
+      <td>${b.status || "created"}</td>
+      <td>
+        ${b.status === "created" ? `<button onclick="confirmBooking('${b.id}')">Confirm</button>` : ""}
+        <button onclick="cancelBooking('${b.id}')">Cancel</button>
+      </td>
     `;
                 bookingsBody.appendChild(tr);
             });
         }
 
-        async function book(id) {
-            await fetch(API + "/bookings", {
+        async function createNewEvent() {
+            await apiFetch(API + "/events", {
                 method: "POST",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({ event_id: id })
+                body: JSON.stringify({
+                    title: eventTitle.value,
+                    eventdate: eventDate.value,
+                    total: parseInt(eventSeats.value),
+                    period: parseInt(eventPeriod.value)
+                })
             });
-            loadEvents();
+            loadEventsAdmin();
+        }
+
+        async function deleteEvent(id) {
+            await apiFetch(API + "/events/" + id, { method: "DELETE", headers: authHeaders() });
+            loadEventsAdmin();
+        }
+
+        async function book(id) {
+            await apiFetch(API + "/bookings", {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    eventid: parseInt(id)
+                })
+            });
+            loadEventsUser();
             loadBookings();
         }
 
-        async function cancel(id) {
-            await fetch(API + "/bookings/" + id, {
-                method: "DELETE",
-                headers: authHeaders()
-            });
+        async function confirmBooking(id) {
+            await apiFetch(API + "/bookings/" + id + "/confirm", { method: "POST", headers: authHeaders() });
             loadBookings();
-            loadEvents();
+            loadEventsUser();
         }
 
-        async function delEvent(id) {
-            await fetch(API + "/events/" + id, {
-                method: "DELETE",
-                headers: authHeaders()
+        async function cancelBooking(id) {
+            await apiFetch(API + "/bookings/" + id, { method: "DELETE", headers: authHeaders() });
+            loadBookings();
+            if (role === "user") loadEventsUser();
+            else loadEventsAdmin();
+        }
+
+        function render() {
+            // всё скрываем
+            auth.classList.add("hidden");
+            eventsAdmin.classList.add("hidden");
+            eventsUser.classList.add("hidden");
+            bookings.classList.add("hidden");
+
+            if (!token) {
+                auth.classList.remove("hidden");
+                return;
+            }
+
+
+
+            if (role === "admin") {
+                eventsAdmin.classList.remove("hidden");
+                loadEventsAdmin();
+            } else {
+                eventsUser.classList.remove("hidden");
+                bookings.classList.remove("hidden");
+                loadEventsUser();
+                loadBookings();
+            }
+
+
+        }
+
+        async function apiFetch(url, options = {}) {
+            const res = await fetch(url, {
+                ...options,
+                credentials: "include"
             });
-            loadEvents();
+
+            if (!res.ok) {
+                let msg = "Unexpected error";
+
+                try {
+                    const body = await res.json();
+                    msg = body.error || msg;
+                } catch { }
+
+                if (res.status === 401) {
+                    logout();
+                }
+
+                showError(msg);
+                throw new Error(msg);
+            }
+
+            return res;
+        }
+
+
+        function logout() {
+            token = null;
+            role = null;
+            localStorage.clear();
+            render();
+
+            // показать логин
+            auth.classList.remove("hidden");
+            eventsAdmin.classList.add("hidden");
+            eventsUser.classList.add("hidden");
+            bookings.classList.add("hidden");
+        }
+
+        function showError(message) {
+            const popup = document.getElementById("errorPopup");
+            popup.textContent = message;
+            popup.classList.remove("hidden");
+
+            setTimeout(() => {
+                popup.classList.add("hidden");
+            }, 4000);
         }
 
         function init() {
-            if (!token) return;
-
-            auth.classList.add("hidden");
-            events.classList.remove("hidden");
-            bookings.classList.remove("hidden");
-
-            loadEvents();
-            loadBookings();
+            token = localStorage.getItem("token");
+            role = localStorage.getItem("role");
+            render();
         }
+
+
 
         init();
     </script>
+    <div id="errorPopup" class="hidden"></div>
+    <style>
+        #errorPopup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .2);
+            max-width: 400px;
+            z-index: 1000;
+        }
+    </style>
+
 
 </body>
 

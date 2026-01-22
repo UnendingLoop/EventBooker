@@ -14,7 +14,7 @@ type EBHandlers struct {
 }
 
 type HService interface {
-	BookEvent(ctx context.Context, book *model.Book, uid int) error
+	BookEvent(ctx context.Context, book *model.Book) error
 	CancelBook(ctx context.Context, bid int, uid int) error
 	ConfirmBook(ctx context.Context, bid int, uid int) error
 	CreateEvent(ctx context.Context, event *model.Event) error
@@ -55,6 +55,13 @@ func stringFromCtx(ctx *gin.Context, key string) string {
 		return v.(string)
 	}
 	return ""
+}
+
+func intFromCtx(ctx *gin.Context, key string) int {
+	if v := ctx.Value(key); v != nil {
+		return v.(int)
+	}
+	return 0
 }
 
 func stringToInt(input string) int {

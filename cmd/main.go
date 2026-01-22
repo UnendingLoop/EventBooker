@@ -22,6 +22,7 @@ import (
 )
 
 func main() {
+	log.Println("Starting EventBook application...")
 	// инициализировать конфиг/ считать энвы
 	appConfig := config.New()
 	appConfig.EnableEnv("")
@@ -50,22 +51,21 @@ func main() {
 	mode := appConfig.GetString("GIN_MODE")
 	engine := ginext.New(mode)
 	engine.Use(
-		mwauthlog.RequestIDMiddleware()) // вставка уникального UID в каждый реквест
+		mwauthlog.RequestID()) // вставка уникального UID в каждый реквест
 
 	events := engine.Group("/events", mwauthlog.RequireAuth([]byte(appConfig.GetString("SECRET"))))
-	books := engine.Group("/books", mwauthlog.RequireAuth([]byte(appConfig.GetString("SECRET"))))
+	books := engine.Group("/bookings", mwauthlog.RequireAuth([]byte(appConfig.GetString("SECRET"))))
 	auth := engine.Group("/auth")
 
 	engine.GET("/ping", handlers.SimplePinger)
-	engine.Static("", "./internal/web/base") // UI админа/юзера - функциональность и контент зависит от роли
+	engine.Static("/ui", "./internal/web") // UI админа/юзера - функциональность и контент зависит от роли
 
-	auth.POST("/signup", handlers.SignUpUser)       // регистрация пользователя
-	auth.POST("/login", handlers.LoginUser)         // авторизация
-	auth.Static("/signin", "./internal/web/signin") // страница с формой авторизации/регистрации
+	auth.POST("/signup", handlers.SignUpUser) // регистрация пользователя
+	auth.POST("/login", handlers.LoginUser)   // авторизация
 
 	events.POST("", mwauthlog.RequireRole("admin"), handlers.CreateEvent)       // создание ивента - только админ
 	events.GET("", handlers.GetEvents)                                          // список всех ивентов
-	events.DELETE("/:id", mwauthlog.RequireRole("admin"), handlers.DeleteEvent) // удаление ивента
+	events.DELETE("/:id", mwauthlog.RequireRole("admin"), handlers.DeleteEvent) // удаление ивента - только админ
 
 	books.POST("", handlers.BookEvent)               // создание бронирования
 	books.POST("/:id/confirm", handlers.ConfirmBook) // подтверждение бронирования
@@ -93,7 +93,7 @@ func main() {
 	}()
 
 	// cleaner
-	clb := cleaner.NewBookCleaner(nil)
+	clb := cleaner.NewBookCleaner(svc)
 	clb.StartBookCleaner(ctx, 30)
 
 	// слушаем контекст прерываний для запуска Graceful Shutdown
@@ -117,6 +117,6 @@ func shutdown(dbConn *dbpg.DB, srv *http.Server) {
 	if err := dbConn.Master.Close(); err != nil {
 		log.Println("Failed to close DB-conn correctly:", err)
 	} else {
-		log.Println("DBconn is closed")
+		log.Println("DBconn is closed.")
 	}
 }

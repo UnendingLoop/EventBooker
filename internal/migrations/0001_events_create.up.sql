@@ -12,14 +12,8 @@ CREATE TABLE IF NOT EXISTS events (
     event_date TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     bookwindow INT NOT NULL DEFAULT 1800 CHECK (bookwindow > 0), -- 30 минут
-    total_seats INT NOT NULL CHECK (
-        total_seats > 0
-        AND total_seats >= avail_seats
-    ),
-    avail_seats INT NOT NULL CHECK (
-        avail_seats >= 0
-        AND avail_seats <= total_seats
-    )
+    total_seats INT NOT NULL CHECK (total_seats > 0),
+    avail_seats INT NOT NULL CHECK (avail_seats >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -30,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     surname TEXT,
     tel TEXT,
     email TEXT UNIQUE NOT NULL,
-    pass_hash TEXT NOT NULL,
+    pass_hash TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS bookings (
@@ -48,7 +42,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     confirm_deadline TIMESTAMPTZ NOT NULL,
     --confirmed_at TIMESTAMPTZ,
     CONSTRAINT fk_bookings_events FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT fk_bookings_users FOREIGN KEY (user_id) REFERENCES users (uid) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_bookings_users FOREIGN KEY (user_id) REFERENCES users (id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 -- Индексы
 CREATE INDEX idx_bookings_event ON bookings (event_id);

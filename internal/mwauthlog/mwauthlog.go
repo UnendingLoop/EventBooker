@@ -20,7 +20,7 @@ type (
 	}
 )
 
-func RequestIDMiddleware() gin.HandlerFunc {
+func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rid := uuid.New().String()
 
@@ -75,6 +75,7 @@ func RequireAuth(secret []byte) gin.HandlerFunc {
 		// прокидываем дальше
 		c.Set("user_id", claims.UserID)
 		c.Set("role", claims.Role)
+		c.Set("email", claims.Email)
 
 		c.Next()
 	}

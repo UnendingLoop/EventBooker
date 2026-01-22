@@ -23,7 +23,7 @@ type EBRepo interface {
 	CreateUser(ctx context.Context, exec ebpostgres.Executor, newUser *model.User) error
 
 	DeleteEvent(ctx context.Context, exec ebpostgres.Executor, eventID int) error // только для админа
-	DeleteBook(ctx context.Context, exec ebpostgres.Executor, bookID int) error   // эксклюзивно для воркера BookCleaner
+	DeleteExpiredBooks(ctx context.Context, exec ebpostgres.Executor) (int, error)
 
 	UpdateBookStatus(ctx context.Context, exec ebpostgres.Executor, bookID int, newStatus string) error
 
@@ -31,7 +31,6 @@ type EBRepo interface {
 	GetEventsList(ctx context.Context, exec ebpostgres.Executor, role string) ([]*model.Event, error)
 	GetBookByID(ctx context.Context, exec ebpostgres.Executor, bookID int) (*model.Book, error)
 	GetBooksListByUser(ctx context.Context, exec ebpostgres.Executor, id int) ([]*model.Book, error)
-	GetExpiredBooksList(ctx context.Context, exec ebpostgres.Executor) ([]*model.Book, error)
 	GetUserByID(ctx context.Context, exec ebpostgres.Executor, userID int) (*model.User, error)
 	GetUserByEmail(ctx context.Context, exec ebpostgres.Executor, email string) (*model.User, error)
 

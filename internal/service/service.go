@@ -92,15 +92,13 @@ func (eb EBService) CreateEvent(ctx context.Context, event *model.Event) error {
 	return nil
 }
 
-func (eb EBService) BookEvent(ctx context.Context, book *model.Book, uid int) error {
+func (eb EBService) BookEvent(ctx context.Context, book *model.Book) error {
 	rid := model.RequestIDFromCtx(ctx)
 
 	if book.EventID <= 0 || book.UserID <= 0 {
 		return model.ErrEmptyBookInfo // 400
 	}
-	if book.UserID != uid {
-		return model.ErrAccessDenied
-	}
+
 	book.Status = model.BookStatusCreated
 
 	// транзакция - бегин
@@ -109,9 +107,9 @@ func (eb EBService) BookEvent(ctx context.Context, book *model.Book, uid int) er
 		log.Printf("RID %q Failed to begin transaction in 'BookEvent': %v", rid, err)
 		return model.ErrCommon500 // 500
 	}
-	commited := false
+	committed := false
 	defer func() {
-		if !commited {
+		if !committed {
 			if err := tx.Rollback(); err != nil {
 				log.Printf("RID %q Failed to rollback transaction in 'BookEvent': %v", rid, err)
 			}
@@ -159,7 +157,7 @@ func (eb EBService) BookEvent(ctx context.Context, book *model.Book, uid int) er
 		return model.ErrCommon500
 	}
 
-	commited = true
+	committed = true
 
 	return nil
 }
@@ -180,9 +178,9 @@ func (eb EBService) ConfirmBook(ctx context.Context, bid int, uid int) error {
 		log.Printf("RID %q Failed to begin transaction in 'ConfirmBook': %v", rid, err)
 		return model.ErrCommon500
 	}
-	commited := false
+	committed := false
 	defer func() {
-		if !commited {
+		if !committed {
 			if err := tx.Rollback(); err != nil {
 				log.Printf("RID %q Failed to rollback transaction in 'CancelBook': %v", rid, err)
 			}
@@ -225,7 +223,7 @@ func (eb EBService) ConfirmBook(ctx context.Context, bid int, uid int) error {
 		log.Printf("RID %q Failed to commit transaction in 'ConfirmBook': %v", rid, err)
 		return model.ErrCommon500
 	}
-	commited = true
+	committed = true
 	return nil
 }
 
@@ -245,9 +243,9 @@ func (eb EBService) CancelBook(ctx context.Context, bid int, uid int) error { //
 		log.Printf("RID %q Failed to begin transaction in 'CancelBook': %v", rid, err)
 		return model.ErrCommon500
 	}
-	commited := false
+	committed := false
 	defer func() {
-		if !commited {
+		if !committed {
 			if err := tx.Rollback(); err != nil {
 				log.Printf("RID %q Failed to rollback transaction in 'CancelBook': %v", rid, err)
 			}
@@ -298,7 +296,7 @@ func (eb EBService) CancelBook(ctx context.Context, bid int, uid int) error { //
 		log.Printf("RID %q Failed to commit transaction in 'CancelBook': %v", rid, err)
 		return model.ErrCommon500
 	}
-	commited = true
+	committed = true
 	return nil
 }
 
@@ -318,9 +316,9 @@ func (eb EBService) DeleteEvent(ctx context.Context, eid int, role string) error
 		log.Printf("RID %q Failed to begin transaction in 'DeleteEvent': %v", rid, err)
 		return model.ErrCommon500
 	}
-	commited := false
+	committed := false
 	defer func() {
-		if !commited {
+		if !committed {
 			if err := tx.Rollback(); err != nil {
 				log.Printf("RID %q Failed to rollback transaction in 'DeleteEvent': %v", rid, err)
 			}
@@ -334,7 +332,7 @@ func (eb EBService) DeleteEvent(ctx context.Context, eid int, role string) error
 		case errors.Is(err, model.ErrEventNotFound):
 			return err
 		default:
-			log.Printf("RID %q Failed to get book from DB in 'DeleteEvent': %q", rid, err)
+			log.Printf("RID %q Failed to get event from DB in 'DeleteEvent': %v", rid, err)
 			return model.ErrCommon500
 		}
 	}
@@ -343,7 +341,7 @@ func (eb EBService) DeleteEvent(ctx context.Context, eid int, role string) error
 	}
 
 	// удаляем ивент
-	if err := eb.repo.DeleteEvent(ctx, eb.db, eid); err != nil {
+	if err := eb.repo.DeleteEvent(ctx, tx, eid); err != nil {
 		log.Printf("RID %q Failed to delete event in DB in 'DeleteEvent': %v", rid, err)
 		return model.ErrCommon500
 	}
@@ -354,61 +352,19 @@ func (eb EBService) DeleteEvent(ctx context.Context, eid int, role string) error
 		return model.ErrCommon500
 	}
 
-	commited = true
+	committed = true
 
 	return nil
 }
 
 func (eb EBService) CleanExpiredBooks(ctx context.Context) error {
-	// транзакция - бегин
-	tx, err := eb.db.BeginTx(ctx, nil)
+	n, err := eb.repo.DeleteExpiredBooks(ctx, eb.db)
 	if err != nil {
-		log.Println("Failed to begin transaction:", err)
-		return model.ErrCommon500
-	}
-	commited := false
-	defer func() {
-		if !commited {
-			if err := tx.Rollback(); err != nil {
-				log.Printf("Failed to rollback transaction in 'CleanExpiredBooks': %v", err)
-			}
-		}
-	}()
-
-	// запрос всех подходящих броней
-	books, err := eb.repo.GetExpiredBooksList(ctx, tx)
-	if err != nil {
-		log.Println("Failed to fetch expired books in 'CleanExpiredBooks':", err)
-		return model.ErrCommon500
-	}
-	if len(books) == 0 {
-		return nil
-	}
-
-	// в цикле проделать декремент ивентов и удаление броней
-	for _, b := range books {
-		// если статус брони cancelled - availSeats уже инкрементирован
-		if b.Status != model.BookStatusCancelled {
-			if err := eb.repo.IncrementAvailSeatsByEventID(ctx, tx, b.EventID); err != nil {
-				log.Println("Failed to decrement event avail.seats in 'CleanExpiredBooks':", err)
-				return model.ErrCommon500
-			}
-		}
-
-		if err = eb.repo.DeleteBook(ctx, tx, b.ID); err != nil {
-			log.Println("Failed to delete expired book in 'CleanExpiredBooks':", err)
-			return model.ErrCommon500
-		}
-	}
-
-	// закоммитить транзакцию
-	if err := tx.Commit(); err != nil {
-		log.Println("Failed to commit transaction in 'CleanExpiredBooks':", err)
+		log.Println("Failed to batch-remove books in 'CleanExpiredBooks':", err)
 		return model.ErrCommon500
 	}
 
-	commited = true
-	log.Printf("Cleaned %d expired bookings\n", len(books))
+	log.Printf("Cleaned %d expired bookings\n", n)
 	return nil
 }
 

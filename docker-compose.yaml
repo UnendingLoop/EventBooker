@@ -20,7 +20,7 @@ services:
     image: eventbooker
     container_name: eventbooker
     env_file: .env
-    command: [ "/usr/local/bin/api" ]
+    command: [ "/usr/local/bin/eventbooker" ]
     ports:
       - "8080:8080"
     depends_on:

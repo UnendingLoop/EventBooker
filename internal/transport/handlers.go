@@ -24,7 +24,7 @@ func (eh *EBHandlers) SignUpUser(ctx *gin.Context) {
 
 	token, err := eh.svc.CreateUser(ctx.Request.Context(), &newUser)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 	resp := convertUserAuthToResponse(&newUser)
@@ -45,11 +45,11 @@ func (eh *EBHandlers) SignUpUser(ctx *gin.Context) {
 func (eh *EBHandlers) CreateEvent(ctx *gin.Context) {
 	// логируем админовые ивенты
 	rid := stringFromCtx(ctx, "request_id")
-	uid := stringFromCtx(ctx, "user_id")
+	uid := intFromCtx(ctx, "user_id")
 	mail := stringFromCtx(ctx, "email")
 	role := stringFromCtx(ctx, "role")
 
-	log.Printf("rid=%q userID=%q userEmail=%q role=%q creating event", rid, uid, mail, role)
+	log.Printf("rid=%q userID=%d userEmail=%q role=%q creating event", rid, uid, mail, role)
 
 	// дальше обычная логика
 	if role != "admin" {
@@ -64,7 +64,7 @@ func (eh *EBHandlers) CreateEvent(ctx *gin.Context) {
 	}
 
 	if err := eh.svc.CreateEvent(ctx.Request.Context(), &event); err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -81,7 +81,7 @@ func (eh *EBHandlers) LoginUser(ctx *gin.Context) {
 
 	token, user, err := eh.svc.LoginUser(ctx.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 	resp := convertUserAuthToResponse(user)
@@ -103,7 +103,7 @@ func (eh *EBHandlers) GetEvents(ctx *gin.Context) {
 	role := stringFromCtx(ctx, "role")
 	res, err := eh.svc.GetEventsList(ctx.Request.Context(), role)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -113,11 +113,11 @@ func (eh *EBHandlers) GetEvents(ctx *gin.Context) {
 func (eh *EBHandlers) DeleteEvent(ctx *gin.Context) {
 	// логируем админовые ивенты
 	rid := stringFromCtx(ctx, "request_id")
-	uid := stringFromCtx(ctx, "user_id")
+	uid := intFromCtx(ctx, "user_id")
 	mail := stringFromCtx(ctx, "email")
 	role := stringFromCtx(ctx, "role")
 
-	log.Printf("rid=%q userID=%q userEmail=%q role=%q deleting event", rid, uid, mail, role)
+	log.Printf("rid=%q userID=%d userEmail=%q role=%q deleting event", rid, uid, mail, role)
 
 	// обычный флоу
 	rawID, ok := ctx.Params.Get("id")
@@ -129,7 +129,7 @@ func (eh *EBHandlers) DeleteEvent(ctx *gin.Context) {
 	eventID := stringToInt(rawID)
 	err := eh.svc.DeleteEvent(ctx.Request.Context(), eventID, role)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -139,14 +139,15 @@ func (eh *EBHandlers) DeleteEvent(ctx *gin.Context) {
 func (eh *EBHandlers) BookEvent(ctx *gin.Context) {
 	var book model.Book
 	if err := ctx.ShouldBindJSON(&book); err != nil {
+		log.Printf("Failed to parse JSON: %v", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking payload"})
 		return
 	}
-	uid := stringFromCtx(ctx, "user_id")
+	book.UserID = intFromCtx(ctx, "user_id")
 
-	err := eh.svc.BookEvent(ctx.Request.Context(), &book, stringToInt(uid))
+	err := eh.svc.BookEvent(ctx.Request.Context(), &book)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -154,15 +155,15 @@ func (eh *EBHandlers) BookEvent(ctx *gin.Context) {
 }
 
 func (eh *EBHandlers) ConfirmBook(ctx *gin.Context) {
-	uid := stringFromCtx(ctx, "user_id")
+	uid := intFromCtx(ctx, "user_id")
 	bid, ok := ctx.Params.Get("id")
 	if !ok {
 		ctx.JSON(400, gin.H{"error": "empty book id"})
 		return
 	}
 
-	if err := eh.svc.ConfirmBook(ctx.Request.Context(), stringToInt(bid), stringToInt(uid)); err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+	if err := eh.svc.ConfirmBook(ctx.Request.Context(), stringToInt(bid), uid); err != nil {
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -170,11 +171,11 @@ func (eh *EBHandlers) ConfirmBook(ctx *gin.Context) {
 }
 
 func (eh *EBHandlers) GetUserBooks(ctx *gin.Context) {
-	uid := stringFromCtx(ctx, "user_id")
+	uid := intFromCtx(ctx, "user_id")
 
-	res, err := eh.svc.GetBooksListByUserID(ctx.Request.Context(), stringToInt(uid))
+	res, err := eh.svc.GetBooksListByUserID(ctx.Request.Context(), uid)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 
@@ -182,14 +183,14 @@ func (eh *EBHandlers) GetUserBooks(ctx *gin.Context) {
 }
 
 func (eh *EBHandlers) CancelBook(ctx *gin.Context) {
-	uid := stringFromCtx(ctx, "user_id")
+	uid := intFromCtx(ctx, "user_id")
 	bid, ok := ctx.Params.Get("id")
 	if !ok {
 		ctx.JSON(400, gin.H{"error": "empty book id"})
 		return
 	}
-	if err := eh.svc.CancelBook(ctx.Request.Context(), stringToInt(bid), stringToInt(uid)); err != nil {
-		ctx.JSON(500, gin.H{"error": err.Error()})
+	if err := eh.svc.CancelBook(ctx.Request.Context(), stringToInt(bid), uid); err != nil {
+		ctx.JSON(errorCodeDefiner(err), gin.H{"error": err.Error()})
 		return
 	}
 

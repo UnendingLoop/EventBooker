@@ -21,6 +21,7 @@ var (
 	ErrIncorrectEventTime = errors.New("event date cannot be in the past")
 	ErrEmptyEventInfo     = errors.New("incomplete data provided to create event")
 	ErrEmptyBookInfo      = errors.New("incomplete data provided to book event")
+	ErrEmptyEmail         = errors.New("empty email provided")
 
 	// 403
 	ErrAccessDenied = errors.New("you don't have enough permissions to complete this operation")

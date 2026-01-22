@@ -15,12 +15,15 @@ func validateNormalizeUser(u *model.User) error {
 		return model.ErrIncorrectUserRole
 	}
 	// Проверка имейл
+	if u.Email == "" {
+		return model.ErrEmptyEmail
+	}
+	u.Email = strings.TrimSpace(u.Email)
+	u.Email = strings.ToLower(u.Email)
 	matchEmail := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	if !matchEmail.MatchString(u.Email) {
 		return model.ErrIncorrectEmail
 	}
-	u.Email = strings.TrimSpace(u.Email)
-	u.Email = strings.ToLower(u.Email)
 
 	// Проверка телефона
 	if u.Tel != "" {
