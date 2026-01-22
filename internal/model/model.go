@@ -68,7 +68,7 @@ func (ct *CustomTime) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	ct.Time = t
+	ct.Time = t.AddDate(0, 0, 1).Add(-1 * time.Millisecond)
 	return nil
 }
 
@@ -104,7 +104,7 @@ func (ct CustomTime) Value() (driver.Value, error) {
 	if ct.IsZero() {
 		return nil, nil
 	}
-	return ct.Time.AddDate(0, 0, 1).Add(-1 * time.Millisecond), nil
+	return ct.Time, nil
 }
 
 func RequestIDFromCtx(ctx context.Context) string {

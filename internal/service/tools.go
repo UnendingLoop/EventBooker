@@ -63,7 +63,6 @@ func validateNormalizeEvent(event *model.Event) error {
 	}
 	now := time.Now().UTC()
 	event.Created = &now
-	event.EventDate = model.CustomTime{event.EventDate.AddDate(0, 0, 1).Add(-1 * time.Millisecond)}
 	event.AvailSeats = event.TotalSeats
 	event.Status = model.EventStatusActual
 
