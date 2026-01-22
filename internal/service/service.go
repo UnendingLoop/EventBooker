@@ -358,13 +358,55 @@ func (eb EBService) DeleteEvent(ctx context.Context, eid int, role string) error
 }
 
 func (eb EBService) CleanExpiredBooks(ctx context.Context) error {
-	n, err := eb.repo.DeleteExpiredBooks(ctx, eb.db)
+	// транзакция - бегин
+	tx, err := eb.db.BeginTx(ctx, nil)
 	if err != nil {
-		log.Println("Failed to batch-remove books in 'CleanExpiredBooks':", err)
+		log.Println("Failed to begin transaction:", err)
+		return model.ErrCommon500
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			if err := tx.Rollback(); err != nil {
+				log.Printf("Failed to rollback transaction in 'CleanExpiredBooks': %v", err)
+			}
+		}
+	}()
+
+	// запрос всех подходящих броней
+	books, err := eb.repo.GetExpiredBooksList(ctx, tx)
+	if err != nil {
+		log.Println("Failed to fetch expired books in 'CleanExpiredBooks':", err)
+		return model.ErrCommon500
+	}
+	if len(books) == 0 {
+		return nil
+	}
+
+	// в цикле проделать декремент ивентов и удаление броней
+	for _, b := range books {
+		// если статус брони cancelled - availSeats уже инкрементирован
+		if b.Status != model.BookStatusCancelled {
+			if err := eb.repo.IncrementAvailSeatsByEventID(ctx, tx, b.EventID); err != nil {
+				log.Println("Failed to decrement event avail.seats in 'CleanExpiredBooks':", err)
+				return model.ErrCommon500
+			}
+		}
+
+		if err = eb.repo.DeleteBook(ctx, tx, b.ID); err != nil {
+			log.Println("Failed to delete expired book in 'CleanExpiredBooks':", err)
+			return model.ErrCommon500
+		}
+	}
+
+	// закоммитить транзакцию
+	if err := tx.Commit(); err != nil {
+		log.Println("Failed to commit transaction in 'CleanExpiredBooks':", err)
 		return model.ErrCommon500
 	}
 
-	log.Printf("Cleaned %d expired bookings\n", n)
+	committed = true
+	log.Printf("Cleaned %d expired bookings\n", len(books))
 	return nil
 }
 

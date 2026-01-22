@@ -104,7 +104,7 @@ func (ct CustomTime) Value() (driver.Value, error) {
 	if ct.IsZero() {
 		return nil, nil
 	}
-	return ct.Time, nil
+	return ct.Time.AddDate(0, 0, 1).Add(-1 * time.Millisecond), nil
 }
 
 func RequestIDFromCtx(ctx context.Context) string {

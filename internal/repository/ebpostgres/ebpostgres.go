@@ -70,6 +70,25 @@ func (pr PostgresRepo) DeleteEvent(ctx context.Context, exec Executor, eventID i
 	return nil
 }
 
+// DeleteBook - эксклюзивно для воркера BookCleaner
+func (pr PostgresRepo) DeleteBook(ctx context.Context, exec Executor, bookID int) error {
+	query := `DELETE FROM bookings
+	WHERE id = $1`
+
+	row, err := exec.ExecContext(ctx, query, bookID)
+	if err != nil {
+		return err // 500
+	}
+	n, err := row.RowsAffected()
+	if err != nil {
+		return err // 500
+	}
+	if n == 0 {
+		return model.ErrBookNotFound
+	}
+	return nil
+}
+
 func (pr PostgresRepo) UpdateBookStatus(ctx context.Context, exec Executor, bookID int, newStatus string) error {
 	query := `UPDATE bookings SET status=$1 WHERE id = $2`
 
@@ -220,20 +239,40 @@ func (pr PostgresRepo) GetBooksListByUser(ctx context.Context, exec Executor, id
 	return books, nil
 }
 
-// DeleteExpiredBooksList - эксклюзивно для воркера BookCleaner
-func (pr PostgresRepo) DeleteExpiredBooks(ctx context.Context, exec Executor) (int, error) {
-	query := `DELETE FROM bookings 
-	WHERE status != $1 
-	AND confirm_deadline < NOW()`
-	row, err := exec.ExecContext(ctx, query, model.BookStatusConfirmed)
+// GetExpiredBooksList - эксклюзивно для воркера BookCleaner
+func (pr PostgresRepo) GetExpiredBooksList(ctx context.Context, exec Executor) ([]*model.Book, error) {
+	query := `SELECT id, event_id, user_id, status, created_at FROM bookings 
+	WHERE confirm_deadline < now() AND status != $1 FOR UPDATE`
+	rows, err := exec.QueryContext(ctx, query, model.BookStatusConfirmed)
 	if err != nil {
-		return 0, err // 500
+		return nil, err
 	}
-	n, err := row.RowsAffected()
-	if err != nil {
-		return 0, err // 500
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error while closing *sql.Rows after scanning: %v", err)
+		}
+	}()
+
+	books := make([]*model.Book, 0)
+
+	for rows.Next() {
+		var book model.Book
+		if err := rows.Scan(&book.ID,
+			&book.EventID,
+			&book.UserID,
+			&book.Status,
+			&book.Created); err != nil {
+			return nil, err
+		}
+		books = append(books, &book)
 	}
-	return int(n), nil
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return books, nil
 }
 
 func (pr PostgresRepo) GetUserByID(ctx context.Context, exec Executor, id int) (*model.User, error) {
